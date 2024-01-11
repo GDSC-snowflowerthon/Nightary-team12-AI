@@ -1,6 +1,10 @@
-from . import views
-from django.urls import path
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from .views import SleepDataViewSet
 
-urlpatterns=[
-    path('predict-sleep/',views.sleep_prediction,name='sleep_prediction'),
+router = DefaultRouter()
+router.register(r'sleepdata', SleepDataViewSet)
+
+urlpatterns = [
+    path('', include(router.urls)),
 ]

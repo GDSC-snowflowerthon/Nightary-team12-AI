@@ -77,7 +77,7 @@ def call_chat_gpt_api(prompt):
       {
         "role": "system",
         "content": "You are a analyst who is analyzing sleep patterns of a user. Please analyze user's sleep pattern by using Korean.\n"\
-                    "분석은 1. 수면 시간, 2. 수면 일관성, 3. 예측된 수면 시간에 대해서 진행해줬으면 좋겠고, 이후로는 간단한 피드백을 좀 줬으면 좋겠어. 나한테 어떠한 질문도 하지 말아줘."\
+                    "분석은 1. 수면 시간, 2. 수면 일관성, 3. 예측된 수면 시간에 대해서 진행해줬으면 좋겠고, 여기까지 500토큰을 넘지 말아줘. 이후로는 간단한 피드백을 좀 줬으면 좋겠어. 나한테 어떠한 질문도 하지 말아줘."\
                     "Please consider the max_tokens is 999. "
       },
       {

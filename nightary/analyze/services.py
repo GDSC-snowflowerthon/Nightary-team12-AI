@@ -119,7 +119,7 @@ def analyze_sleep_data(data):
         prompt += str(final_predictions['Predicted Start Time'].iloc[i])[:19] + ' ~ ' + str(final_predictions['Predicted End Time'].iloc[i])[:19] + '\n'
 
     prompt+='Please analyse my sleep patterns and give me some advice on how to improve my sleep quality by using Korean.\n'
-    prompt+='피드백은 "--피드백" 으로 시작했으면 좋겠어.\n'
+    prompt+='피드백은 "--피드백" 으로 시작했으면 좋겠어. 피드백 까지는 500 token을 넘기지 말아줘.\n'
     prompt+='Please consider the max_tokens is 999. '
 
 

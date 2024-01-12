@@ -2,15 +2,47 @@
 import pandas as pd
 from statsmodels.tsa.arima.model import ARIMA
 from datetime import datetime, timedelta
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 import base64
 from io import BytesIO
 import requests
 import os
 from dotenv import load_dotenv
 
+
+def process_sleep_data(data):
+    start_dates = data['startSleepDate']
+    end_dates = data['endSleepDate']
+
+    df = pd.DataFrame({'startSleepDate': start_dates, 'endSleepDate': end_dates})
+    df['startSleepDate'] = pd.to_datetime(df['startSleepDate'])
+    df['endSleepDate'] = pd.to_datetime(df['endSleepDate'])
+
+    # 수면 시간 계산(시간 단위)
+    df['sleepDuration'] = (df['endSleepDate'] - df['startSleepDate']).dt.total_seconds() / 3600
+    df.loc[df['sleepDuration'] < 0, 'sleepDuration'] += 24
+
+    # 수면 시작 시간을 시간의 소수점 형식으로 변환 ex)16:30 -> 16.5
+    df['start_hour'] = df['startSleepDate'].dt.hour + df['startSleepDate'].dt.minute / 60 + df['startSleepDate'].dt.second / 3600
+
+    start_time_forecast, duration_forecast = analyze_by_arima(df)
+    
+
+    # End Time 계산(예측 수면 시작 시각 + 예측 수면 시간)
+    future_dates = pd.date_range(start=df['startSleepDate'].max(), periods=6, freq='D')[1:]
+    final_predictions = pd.DataFrame({
+        'Predicted Start Time': [convert_to_datetime(future_dates[i], start_time_forecast[i]) for i in range(5)],
+        'Predicted End Time': [convert_to_datetime(future_dates[i], start_time_forecast[i]) + timedelta(hours=duration_forecast[i]) for i in range(5)]
+    }, index=future_dates)
+
+    # 인덱스 재설정
+    final_predictions = final_predictions.reset_index(drop=True)
+
+    # 1부터 시작하는 인덱스로 조정
+    final_predictions.index = final_predictions.index + 1
+
+    #End Time에 밀리초 제거
+    final_predictions['Predicted End Time'] = final_predictions['Predicted End Time'].dt.strftime('%Y-%m-%d %H:%M:%S')
+    return final_predictions
 
 def analyze_by_arima(df):
     model_start_time = ARIMA(df['start_hour'], order=(1, 1, 1))
@@ -61,65 +93,44 @@ def call_chat_gpt_api(prompt):
     if response_json.get('choices'):
         return response_json['choices'][0]['message']['content'].strip()
 
-def process_sleep_data(data):
-        start_dates = data['startSleepDate']
-        end_dates = data['endSleepDate']
-
-        df = pd.DataFrame({'startSleepDate': start_dates, 'endSleepDate': end_dates})
-        df['startSleepDate'] = pd.to_datetime(df['startSleepDate'])
-        df['endSleepDate'] = pd.to_datetime(df['endSleepDate'])
-
-        # 수면 시간 계산(시간 단위)
-        df['sleepDuration'] = (df['endSleepDate'] - df['startSleepDate']).dt.total_seconds() / 3600
-        df.loc[df['sleepDuration'] < 0, 'sleepDuration'] += 24
-
-        # 수면 시작 시간을 시간의 소수점 형식으로 변환 ex)16:30 -> 16.5
-        df['start_hour'] = df['startSleepDate'].dt.hour + df['startSleepDate'].dt.minute / 60 + df['startSleepDate'].dt.second / 3600
-
-        start_time_forecast, duration_forecast = analyze_by_arima(df)
-    
-
-        # End Time 계산(예측 수면 시작 시각 + 예측 수면 시간)
-        future_dates = pd.date_range(start=df['startSleepDate'].max(), periods=6, freq='D')[1:]
-        final_predictions = pd.DataFrame({
-            'Predicted Start Time': [convert_to_datetime(future_dates[i], start_time_forecast[i]) for i in range(5)],
-            'Predicted End Time': [convert_to_datetime(future_dates[i], start_time_forecast[i]) + timedelta(hours=duration_forecast[i]) for i in range(5)]
-        }, index=future_dates)
-
-        # 인덱스 재설정
-        final_predictions = final_predictions.reset_index(drop=True)
-
-        # 1부터 시작하는 인덱스로 조정
-        final_predictions.index = final_predictions.index + 1
-
-        #End Time에 밀리초 제거
-        final_predictions['Predicted End Time'] = final_predictions['Predicted End Time'].dt.strftime('%Y-%m-%d %H:%M:%S')
-
-        prompt='Here are my recent sleep records: \n'
-        for i in range(20):
-            prompt += str(df['startSleepDate'].iloc[-20+i])[:19] + ' ~ ' + str(df['endSleepDate'].iloc[-20+i])[:19] + '\n'
-        
-        prompt+='\nAnd here are my predicted sleep times for the next 5 days: \n'
-        for i in range(5):
-            prompt += str(final_predictions['Predicted Start Time'].iloc[i])[:19] + ' ~ ' + str(final_predictions['Predicted End Time'].iloc[i])[:19] + '\n'
-
-        prompt+='Please analyse my sleep patterns and give me some advice on how to improve my sleep quality by using Korean.\n'
-        prompt+='피드백은 "--피드백" 으로 시작했으면 좋겠어.\n'
-        prompt+='Please consider the max_tokens is 999. '
-
-
-        # ChatGPT API 호출
-        chat_gpt_response = call_chat_gpt_api(prompt)
-
-        # 분석과 피드백으로 나누기
-        chat_gpt_response = chat_gpt_response.split('--피드백')
+def predict_sleep_data(data):
+        final_predictions = process_sleep_data(data)
 
         response_content = {
         'start_time_forecast': final_predictions['Predicted Start Time'].tolist(),
         'end_time_forecast': final_predictions['Predicted End Time'].tolist(),
-        'chat_gpt_analysis': chat_gpt_response[0],
-        'chat_gpt_feedback': chat_gpt_response[1] 
         }
         
         return response_content
     
+
+def analyze_sleep_data(data):
+    start_dates = data['startSleepDate']
+    end_dates = data['endSleepDate']
+    df = pd.DataFrame({'startSleepDate': start_dates, 'endSleepDate': end_dates})
+    final_predictions = process_sleep_data(data)
+
+    prompt='Here are my recent sleep records: \n'
+    for i in range(20):
+        prompt += str(df['startSleepDate'].iloc[-20+i])[:19] + ' ~ ' + str(df['endSleepDate'].iloc[-20+i])[:19] + '\n'
+        
+    prompt+='\nAnd here are my predicted sleep times for the next 5 days: \n'
+    for i in range(5):
+        prompt += str(final_predictions['Predicted Start Time'].iloc[i])[:19] + ' ~ ' + str(final_predictions['Predicted End Time'].iloc[i])[:19] + '\n'
+
+    prompt+='Please analyse my sleep patterns and give me some advice on how to improve my sleep quality by using Korean.\n'
+    prompt+='피드백은 "--피드백" 으로 시작했으면 좋겠어.\n'
+    prompt+='Please consider the max_tokens is 999. '
+
+
+    # ChatGPT API 호출
+    chat_gpt_response = call_chat_gpt_api(prompt)
+
+    # 분석과 피드백으로 나누기
+    chat_gpt_response = chat_gpt_response.split('--피드백')
+    
+    response_content = {
+        'chat_gpt_analysis': chat_gpt_response[0],
+        'chat_gpt_feedback': chat_gpt_response[1] 
+    }
+    return response_content

@@ -47,7 +47,7 @@ def call_chat_gpt_api(prompt):
       {
         "role": "system",
         "content": "You are a analyst who is analyzing sleep patterns of a user. Please analyze user's sleep pattern by using Korean.\n"\
-                    "분석은 1. 수면 시간, 2. 수면 일관성, 3. 예측된 수면 시간에 대해서 진행해줬으면 좋겠고, 이후로는 간단한 피드백을 좀 줬으면 좋겠어"\
+                    "분석은 1. 수면 시간, 2. 수면 일관성, 3. 예측된 수면 시간에 대해서 진행해줬으면 좋겠고, 이후로는 간단한 피드백을 좀 줬으면 좋겠어. 나한테 어떠한 질문도 하지 말아줘."\
                     "Please consider the max_tokens is 999. "
       },
       {
@@ -59,7 +59,6 @@ def call_chat_gpt_api(prompt):
     }
 
     response = requests.post(api_url, headers=headers, json=data)
-    print(response.text)
     response_json = response.json()
     if response_json.get('choices'):
         return response_json['choices'][0]['message']['content'].strip()
@@ -130,7 +129,7 @@ def process_sleep_data(data):
             prompt += str(final_predictions['Predicted Start Time'].iloc[i])[:19] + ' ~ ' + str(final_predictions['Predicted End Time'].iloc[i])[:19] + '\n'
 
         prompt+='Please analyse my sleep patterns and give me some advice on how to improve my sleep quality by using Korean.\n'
-        prompt+='분석은 1. 수면 시간, 2. 수면 일관성, 3. 예측된 수면 시간에 대해서 진행해줬으면 좋겠고, 이후로는 간단한 피드백을 좀 줬으면 좋겠어. 이 때 피드백은 "--피드백" 으로 시작했으면 좋겠어.\n'
+        prompt+='피드백은 "--피드백" 으로 시작했으면 좋겠어.\n'
         prompt+='Please consider the max_tokens is 999. '
 
 

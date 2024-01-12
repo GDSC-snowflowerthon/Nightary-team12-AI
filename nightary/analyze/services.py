@@ -12,8 +12,6 @@ import os
 from dotenv import load_dotenv
 
 
-
-
 def analyze_by_arima(df):
     model_start_time = ARIMA(df['start_hour'], order=(1, 1, 1))
     model_start_time_fit = model_start_time.fit()
@@ -63,28 +61,6 @@ def call_chat_gpt_api(prompt):
     if response_json.get('choices'):
         return response_json['choices'][0]['message']['content'].strip()
 
-def make_graph(df, start_time_forecast, duration_forecast):
-    # 그래프 생성
-    future_dates = pd.date_range(start=df['startSleepDate'].max(), periods=6, freq='D')[1:]
-    plt.figure(figsize=(10, 6))
-    plt.plot(df['startSleepDate'][-20:], df['sleepDuration'][-20:], label='Actual Sleep Duration')
-    plt.plot(future_dates[:5], duration_forecast, label='Predicted Sleep Duration')
-    plt.xlabel('Date')
-    plt.ylabel('Sleep Duration (hours)')
-    plt.title('Sleep Duration Prediction')
-    plt.legend()
-    plt.grid(True)
-
-    # 그래프를 BytesIO 버퍼에 저장
-    buf = BytesIO()
-    plt.savefig(buf, format='png')
-    buf.seek(0)
-
-    # base64 인코딩을 사용하여 이미지를 문자열로 변환
-    image_base64 = base64.b64encode(buf.read()).decode('utf-8')
-    buf.close()
-    return image_base64
-
 def process_sleep_data(data):
         start_dates = data['startSleepDate']
         end_dates = data['endSleepDate']
@@ -101,6 +77,7 @@ def process_sleep_data(data):
         df['start_hour'] = df['startSleepDate'].dt.hour + df['startSleepDate'].dt.minute / 60 + df['startSleepDate'].dt.second / 3600
 
         start_time_forecast, duration_forecast = analyze_by_arima(df)
+    
 
         # End Time 계산(예측 수면 시작 시각 + 예측 수면 시간)
         future_dates = pd.date_range(start=df['startSleepDate'].max(), periods=6, freq='D')[1:]
@@ -117,8 +94,6 @@ def process_sleep_data(data):
 
         #End Time에 밀리초 제거
         final_predictions['Predicted End Time'] = final_predictions['Predicted End Time'].dt.strftime('%Y-%m-%d %H:%M:%S')
-
-        image_base64 = make_graph(df, start_time_forecast, duration_forecast)
 
         prompt='Here are my recent sleep records: \n'
         for i in range(20):
@@ -140,7 +115,8 @@ def process_sleep_data(data):
         chat_gpt_response = chat_gpt_response.split('--피드백')
 
         response_content = {
-        'graph': image_base64,
+        'start_time_forecast': final_predictions['Predicted Start Time'].tolist(),
+        'end_time_forecast': final_predictions['Predicted End Time'].tolist(),
         'chat_gpt_analysis': chat_gpt_response[0],
         'chat_gpt_feedback': chat_gpt_response[1] 
         }
